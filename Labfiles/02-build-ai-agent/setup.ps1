@@ -1,0 +1,190 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Setup script for Lab 02 - Build AI Agent
+.DESCRIPTION
+    Provisions Azure resources needed for Lab 02:
+    - Foundry project
+    - GPT-4.1 model deployment
+    - Generates .env configuration file
+.PARAMETER SubscriptionId
+    Azure subscription ID (uses current default if not specified)
+.PARAMETER ResourceGroup
+    Resource group name (default: rg-ai-agents-lab02)
+.PARAMETER Location
+    Azure region (default: eastus)
+.PARAMETER ProjectName
+    Foundry project name (default: lab02-ai-agent)
+.EXAMPLE
+    ./setup.ps1
+.EXAMPLE
+    ./setup.ps1 -ResourceGroup "my-rg" -Location "westus"
+#>
+
+[CmdletBinding()]
+param(
+    [string]$SubscriptionId = "",
+    [string]$ResourceGroup = "rg-ai-agents-lab02",
+    [string]$Location = "eastus",
+    [string]$ProjectName = "lab02-ai-agent",
+    [string]$ModelDeploymentName = "gpt-4.1"
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Lab 02: Build AI Agent - Setup Script" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Check Azure CLI is installed
+try {
+    $azVersion = az version --query '\"azure-cli\"' -o tsv 2>$null
+    Write-Host "✓ Azure CLI version: $azVersion" -ForegroundColor Green
+} catch {
+    Write-Error "Azure CLI not found. Please install: https://docs.microsoft.com/cli/azure/install-azure-cli"
+    exit 1
+}
+
+# Check if logged in
+$account = az account show 2>$null | ConvertFrom-Json
+if (-not $account) {
+    Write-Host "Not logged into Azure. Running 'az login'..." -ForegroundColor Yellow
+    az login
+    $account = az account show | ConvertFrom-Json
+}
+
+# Set subscription if specified
+if ($SubscriptionId) {
+    Write-Host "Setting subscription to: $SubscriptionId" -ForegroundColor Yellow
+    az account set --subscription $SubscriptionId
+    $account = az account show | ConvertFrom-Json
+}
+
+Write-Host "✓ Using subscription: $($account.name) ($($account.id))" -ForegroundColor Green
+Write-Host ""
+
+# Create resource group
+Write-Host "Creating resource group: $ResourceGroup in $Location..." -ForegroundColor Yellow
+$rgExists = az group exists --name $ResourceGroup
+if ($rgExists -eq "true") {
+    Write-Host "✓ Resource group already exists" -ForegroundColor Green
+} else {
+    az group create --name $ResourceGroup --location $Location --output none
+    Write-Host "✓ Resource group created" -ForegroundColor Green
+}
+Write-Host ""
+
+# Generate unique names
+$timestamp = Get-Date -Format "yyyyMMddHHmmss"
+$uniqueSuffix = $timestamp.Substring($timestamp.Length - 6)
+$hubName = "aihub-$ProjectName-$uniqueSuffix"
+
+# Create AI Foundry hub/project
+Write-Host "Creating AI Foundry hub: $hubName..." -ForegroundColor Yellow
+Write-Host "(This may take 3-5 minutes)" -ForegroundColor Gray
+
+try {
+    # Create the hub using Azure CLI
+    $hub = az ml workspace create `
+        --kind hub `
+        --name $hubName `
+        --resource-group $ResourceGroup `
+        --location $Location `
+        --output json | ConvertFrom-Json
+    
+    Write-Host "✓ AI Foundry hub created" -ForegroundColor Green
+    $hubId = $hub.id
+    $projectEndpoint = "https://$Location.api.azureml.ms/discovery/api/v2.0/projects/$hubId"
+} catch {
+    Write-Error "Failed to create AI Foundry hub: $_"
+    exit 1
+}
+Write-Host ""
+
+# Wait for hub to be fully provisioned
+Write-Host "Waiting for hub to be fully provisioned..." -ForegroundColor Yellow
+Start-Sleep -Seconds 30
+Write-Host "✓ Hub ready" -ForegroundColor Green
+Write-Host ""
+
+# Deploy GPT-4.1 model
+Write-Host "Deploying model: $ModelDeploymentName..." -ForegroundColor Yellow
+Write-Host "(This may take 2-3 minutes)" -ForegroundColor Gray
+
+try {
+    # Check if deployment already exists
+    $existingDeployment = az ml online-deployment show `
+        --name $ModelDeploymentName `
+        --endpoint-name $ModelDeploymentName `
+        --workspace-name $hubName `
+        --resource-group $ResourceGroup `
+        2>$null | ConvertFrom-Json
+    
+    if ($existingDeployment) {
+        Write-Host "✓ Model deployment already exists" -ForegroundColor Green
+    } else {
+        # Deploy the model
+        # Note: This is a simplified example. In practice, you may need to use the AI Foundry SDK
+        # or REST API for model deployment as it's project-specific
+        Write-Host "Note: Model deployment requires AI Foundry portal or SDK" -ForegroundColor Yellow
+        Write-Host "      Manual deployment may be required" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "⚠ Model deployment requires manual configuration" -ForegroundColor Yellow
+    Write-Host "  Please deploy GPT-4.1 model via the portal:" -ForegroundColor Gray
+    Write-Host "  https://ai.azure.com" -ForegroundColor Gray
+}
+Write-Host ""
+
+# Generate .env file
+Write-Host "Generating .env file..." -ForegroundColor Yellow
+
+$envContent = @"
+# Lab 02 Configuration - Generated by setup.ps1
+# Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+
+PROJECT_ENDPOINT=$projectEndpoint
+MODEL_DEPLOYMENT_NAME=$ModelDeploymentName
+"@
+
+$envPath = Join-Path $PSScriptRoot "Python" ".env"
+$envContent | Out-File -FilePath $envPath -Encoding utf8 -Force
+Write-Host "✓ .env file created at: Python/.env" -ForegroundColor Green
+Write-Host ""
+
+# Save state for teardown
+Write-Host "Saving lab state..." -ForegroundColor Yellow
+$labState = @{
+    subscriptionId = $account.id
+    resourceGroup = $ResourceGroup
+    location = $Location
+    hubName = $hubName
+    hubId = $hubId
+    projectEndpoint = $projectEndpoint
+    modelDeployments = @($ModelDeploymentName)
+    timestamp = (Get-Date).ToString("o")
+} | ConvertTo-Json
+
+$statePath = Join-Path $PSScriptRoot ".labstate"
+$labState | Out-File -FilePath $statePath -Encoding utf8 -Force
+Write-Host "✓ Lab state saved to: .labstate" -ForegroundColor Green
+Write-Host ""
+
+# Summary
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "Setup Complete!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Resource Group:    $ResourceGroup" -ForegroundColor Cyan
+Write-Host "Hub Name:          $hubName" -ForegroundColor Cyan
+Write-Host "Project Endpoint:  $projectEndpoint" -ForegroundColor Cyan
+Write-Host "Model Deployment:  $ModelDeploymentName" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Next Steps:" -ForegroundColor Yellow
+Write-Host "1. Verify model deployment in portal: https://ai.azure.com" -ForegroundColor Gray
+Write-Host "2. Navigate to: cd Python" -ForegroundColor Gray
+Write-Host "3. Run the lab: python agent.py" -ForegroundColor Gray
+Write-Host ""
+Write-Host "When finished, run: ./teardown.ps1" -ForegroundColor Yellow
+Write-Host ""

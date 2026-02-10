@@ -45,7 +45,7 @@ Use with `/` commands in Copilot Chat:
 |------|---------|
 | `copilot-instructions.md` | Base instructions applied to ALL Copilot interactions in this repo |
 | `copilot-setup-steps.yml` | Pre-installs dependencies for Copilot coding agent environment |
-| `CUSTOM_CONTENT.md` | Inventory of files added beyond the upstream repo |
+| `CUSTOM_CONTENT.md` | ✅ Inventory of files added beyond the upstream repo |
 
 ## Getting Started
 

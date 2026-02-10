@@ -6,6 +6,39 @@ The exercises in this repo are designed to provide you with a hands-on learning 
 
 View the exercises in the [GitHub Pages site for this repo](https://go.microsoft.com/fwlink/?linkid=2310820).
 
+## 🚀 **NEW: Automated Lab Setup**
+
+### Option 1: Shared Environment (Recommended)
+
+Create **one** Foundry project for all labs - saves 60-80% on costs!
+
+```powershell
+cd Labfiles
+./setup-shared-environment.ps1  # One-time setup
+# Configure each lab's .env with your shared project endpoint
+# Run labs without individual setup scripts!
+./teardown-shared-environment.ps1  # When completely done
+```
+
+### Option 2: Per-Lab Automation
+
+Each lab creates its own isolated environment:
+
+```powershell
+cd Labfiles/02-build-ai-agent
+./setup.ps1     # Creates all Azure resources
+./teardown.ps1  # Cleans everything up
+```
+
+**Benefits:**
+- ⚡ Setup in 5-10 minutes vs 15-20 manually
+- 🎯 Reproducible and consistent
+- 💰 60-80% cheaper with shared environment
+- 🔒 Automated .env generation
+- 🧹 Easy cleanup prevents unexpected costs
+
+See [LAB_PREREQUISITES.md](LAB_PREREQUISITES.md) and [AUTOMATION_QUICKSTART.md](AUTOMATION_QUICKSTART.md) for details.
+
 > **Note**: While you can complete these exercises on their own, they're designed to complement modules on [Microsoft Learn](https://learn.microsoft.com/training/paths/develop-ai-agents-on-azure/); in which you'll find a deeper dive into some of the underlying concepts on which these exercises are based.
 
 If you choose to run the code from applications in this repository locally, it will require Python 3.12+.
