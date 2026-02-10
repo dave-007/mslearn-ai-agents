@@ -1,0 +1,29 @@
+name: "Copilot Setup Steps"
+on: workflow_dispatch
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install common dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio ruff
+          # Install dependencies from all exercises
+          for req in Labfiles/*/Python/requirements.txt; do
+            if [ -f "$req" ]; then
+              pip install -r "$req" || true
+            fi
+          done
+
+      - name: Verify Python setup
+        run: |
+          python --version
+          pip list
